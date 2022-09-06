@@ -1,0 +1,625 @@
+#include <iostream>
+#include <fstream>
+#include <stdio.h>
+#include <pthread.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string>
+#include <regex>
+#include <map>
+#include <sstream>
+using namespace std;
+
+// if error when running program, use this first g++ -D_REENTRANT pthread.cpp -o pthread -lpthread, then use ./pthread
+// msg: **PQLG 4 3 2 7***ABCDEF 1 2 3 4 2 1 0 2 4*M FSSO
+
+void* sifter(void*);
+void* decoder(void*);
+void* substitute(void*);
+void* hill(void*);
+void* summit(void*);
+int alphabetToNumber(char);
+char numberToAlphabet(int);
+string substituteMsg, hillMsg, summitMsg;
+bool acceptInput;
+
+int main()
+{
+    acceptInput = true;
+    pthread_t sifter_id;
+    int result;
+    
+    while(acceptInput){
+        result = pthread_create(&sifter_id, NULL, sifter, NULL);
+        result = pthread_join(sifter_id, NULL);
+
+        
+    }
+    
+    
+    return 0;
+}
+
+// get numerical value of alphabet letter
+int alphabetToNumber(char alphaCh)
+{
+    int num = 0;
+    // alphabets and their positions
+    map<char, int> alphabet = {
+        {'A', 0}, {'B', 1}, {'C', 2}, {'D', 3}, {'E', 4}, {'F', 5}, {'G', 6}, {'H', 7}, {'I', 8},
+        {'J', 9}, {'K', 10}, {'L', 11}, {'M', 12}, {'N', 13}, {'O', 14}, {'P', 15}, {'Q', 16}, {'R', 17},
+        {'S', 18}, {'T', 19}, {'U', 20}, {'V', 21}, {'W', 22}, {'X', 23}, {'Y', 24}, {'Z', 25}
+    };
+
+    // get numerical value of alphabet letter
+    map<char, int>::iterator it;
+    it = alphabet.find(alphaCh);
+    num = it->second;
+
+    return num;
+}
+
+// get alphabet letter of numerical value
+char numberToAlphabet(int alphaNum)
+{
+    char alpha;
+    // alphabets and their positions
+    map<char, int> alphabet = {
+        {'A', 0}, {'B', 1}, {'C', 2}, {'D', 3}, {'E', 4}, {'F', 5}, {'G', 6}, {'H', 7}, {'I', 8},
+        {'J', 9}, {'K', 10}, {'L', 11}, {'M', 12}, {'N', 13}, {'O', 14}, {'P', 15}, {'Q', 16}, {'R', 17},
+        {'S', 18}, {'T', 19}, {'U', 20}, {'V', 21}, {'W', 22}, {'X', 23}, {'Y', 24}, {'Z', 25}
+    };
+
+    // iterate through the map, find the numerical value(second value) and output its alphabet (first value)
+    for(auto it : alphabet){
+        if(it.second == alphaNum){
+            alpha = it.first;
+        }
+    }
+
+    return alpha;
+}
+
+// sifter function, checks if the message is valid
+void* sifter(void*)
+{
+
+    bool valid;
+    int asteriskCount = 0;
+    int inputAttempts = 0;
+
+    // ask for input until user enters a valid sting, three chances
+    do {
+        //user input
+        cout << "Enter a message (three attempts, -1 to exit): ";
+        //char* msg = (char*)malloc(400);
+        //scanf("%[^\n]%*c", msg);
+        //string message(msg);
+
+        
+        string message;
+        getline(cin, message);
+
+        if(message == "-1"){
+            acceptInput = false;
+            return NULL;
+        }
+        
+        // check if the input message contains * ** ***
+        if(message.find('*') != string::npos && message.find("**") != string::npos && message.find("***") != string::npos){
+            
+            //valid = true;
+            // check if there are only 6 asterisk
+            // might not need this since if there are three no null parts that are prefixed by * ** ***, then we dont care about rest maybe??
+            for(int i = 0; i < message.length(); i++){
+                if(message[i] == '*'){
+                    asteriskCount++;
+                }
+            }
+            if(asteriskCount == 6){
+                //cout << "Message is valid. \n";
+                valid = true;
+            } else {
+                //cout << "Message is invalid. \n";
+                valid = false;
+            }
+            
+        
+        }   else {
+            //cout << "Message is invalid. \n";
+            valid = false;
+        }
+
+        // ask user to try again if input message is not valid and if the number of attempts is not 3
+        if(valid && inputAttempts < 3){
+            // if the message is valid, send it to decoder thread
+            pthread_t decoder_id;
+            int result;
+            result = pthread_create(&decoder_id, NULL, decoder, &message);
+            result = pthread_join(decoder_id, NULL);
+            
+        } else {
+            // input attempt
+            inputAttempts++;
+            printf("Message is invalid.\n");
+        }
+
+        
+
+        
+        //cout << "asterisk count: " << asteriskCount << endl;
+    } while ((valid != true) && (inputAttempts < 3));
+
+    if(inputAttempts != 3){
+        acceptInput = true;
+    } else {
+        acceptInput = false;
+    }
+    
+    //cout << inputAttempts << endl;
+
+    return NULL;
+}
+
+// decoder function, divides message into three parts
+void* decoder (void* msg)
+{
+    string message = *static_cast<string*>(msg);
+    //cout << message << endl;
+    string subStr1, subStr2, subStr3;
+    int subStr1Pos, subStr2Pos, subStr3Pos;
+
+    
+    // find the starting position of each part
+    for(int i = 0; i < message.length(); i++){
+        if((message[i-1] != '*') && (message[i] == '*') && (message[i+1] != '*') && (message[i+2] != '*')){
+            subStr1Pos = i;
+            for(int i = 0; i < message.length(); i++){
+                if((message[i-1] != '*') && (message[i] == '*') && (message[i+1] == '*') && (message[i+2] != '*')){
+                    subStr2Pos = i;
+                    for(int i = 0; i < message.length(); i++){
+                        if((message[i-1] != '*') && (message[i] == '*') && (message[i+1] == '*') && (message[i+2] == '*')){
+                            subStr3Pos = i;
+                        }
+                    
+                    }
+                }
+            }
+
+        }
+    }
+
+    // extract substring 1
+    for(int i = subStr1Pos+1; i < message.length(); i++){
+        if(message[i] != '*'){
+            subStr1 += message[i];
+        } else {
+            break;
+        }
+    }
+
+    // extract substring 2
+    for(int i = subStr2Pos+2; i < message.length(); i++){
+        if(message[i] != '*'){
+            subStr2 += message[i];
+        } else {
+            break;
+        }
+    }
+
+    // extract substring 3
+    for(int i = subStr3Pos+3; i < message.length(); i++){
+        if(message[i] != '*'){
+            subStr3 += message[i];
+        } else {
+            break;
+        }
+    }
+    
+    // send each substring to its own thread
+    // substring 1 to substitute thread
+    pthread_t substitute_id;
+    int result;
+    result = pthread_create(&substitute_id, NULL, substitute, &subStr1);
+    
+
+    // substring 2 to hill thread
+    pthread_t hill_id;
+    int result1;
+    result1 = pthread_create(&hill_id, NULL, hill, &subStr2);
+    
+
+    // substring 3 to summit thread
+    pthread_t summit_id;
+    int result2;
+    result2 = pthread_create(&summit_id, NULL, summit, &subStr3);
+    
+
+    // join all the threads
+    result = pthread_join(substitute_id, NULL);
+    result1 = pthread_join(hill_id, NULL);
+    result2 = pthread_join(summit_id, NULL);
+
+    // output deciphered message
+    cout << substituteMsg << " " << hillMsg << " " << summitMsg << endl;
+    
+    return NULL;
+}
+
+// substitue function,deciphers the first part of the message
+void* substitute(void* subStr1)
+{
+    string message = *static_cast<string*>(subStr1);
+    // remove any whitespaces from the beginning of the message
+    while(isspace(message[0])){
+        message = message.substr(1, message.length());
+    }
+    //cout << message << endl;
+
+    // valid string boolean
+    bool valid;
+
+    // check if the first sub string part is valid. the entire string must be alphabets
+    for(int i = 0; i < message.length(); i++){
+        if(isalpha(message[i]) || message[i] == ' '){
+            valid = true;
+        } else {
+            valid = false;
+            break;
+        }
+    }
+    
+    // check if the first character is a token
+    // if(message[1] != ' '){
+    //     valid = false;
+    // }
+
+    if(valid){
+        
+        // find the first character in the message
+        char firstChar = message.at(0);
+        // int firstCharLocation;
+        // for(int i = 0; i < message.length(); i++){
+        //     if(message[i] != ' '){
+        //         firstChar = message[i];
+        //         firstCharLocation = i;
+        //         break;
+        //     } 
+        // }
+        
+        firstChar = toupper(firstChar);
+        //cout << firstChar << endl; // output first character
+
+        // find the number of the first letter amongst the alphabets
+        int firstCharNumber;
+
+        firstCharNumber = alphabetToNumber(firstChar); // number of the first character amongst the alphabets
+
+        //cout << firstCharNumber << endl; // output the number of the first character amongst the alphabets
+
+        // find N
+        int n = (firstCharNumber % 10) + 2;
+
+        // remove the first character from the message
+        message.erase(0,1); // change 1 to message.find(' ') if there should be a space after the first character
+
+        //cout << message << endl; // output the update message
+
+        // decipher the rest of the message, using N
+        string decipheredMsg = message;
+
+        char ch;
+        char charA = 'A'; // letter A
+        char charZ = 'Z'; // letter Z
+        for(int i = 0; i < decipheredMsg.length(); ++i){
+            if(decipheredMsg[i] != ' '){
+                decipheredMsg[i] = toupper(decipheredMsg[i]); // uppercase each letter as the loop iterates over them
+                ch = decipheredMsg[i];  // current character
+                if(ch >= charA && ch <= charZ){ // check if the current character is within bounds (between A and Z, A,Z included)
+                    ch = ch - n; // subtract the value from the key (n)
+                    if(ch < charA){
+                        ch = ch + charZ - charA + 1;
+                    }   
+                    decipheredMsg[i] = ch;
+                }
+            }
+            
+        }
+
+        // output deciphered message
+        //cout << decipheredMsg << " ";
+        substituteMsg = decipheredMsg;
+
+    } else {
+        // exit decoder thread, and ask for another input
+        //cout << "Invalid first part." << endl;
+        substituteMsg = "Invalid first part";
+
+    }
+
+    return NULL;
+}
+
+// hill function, deciphers the second part of the message
+void* hill(void* subStr2)
+{
+    string message = *static_cast<string*>(subStr2);
+    //cout << message << endl;
+   
+    // remove any whitespaces from the beginning of the message
+    while(isspace(message[0])){
+        message = message.substr(1, message.length());
+    }
+
+    string section1, section2;
+    section1 = message.substr(0, message.find(' ')); // split the message from first character to the first space
+    section2 = message.substr(section1.length(), message.length()); // split the message starting from end of sections 1 to end of the message
+    
+    // output both sections
+    //cout << endl << "section1: " << section1 << endl;
+    //cout << "section2: " << section2 << endl;
+
+    // check is both sections are valid: section 1 must only include alphabets, must be even
+    // section 2 must only have 4 tokens, and must be only digits
+    // check section 1 for validity
+    bool isAlphaLetters = true;
+    for(int i = 0; i < section1.length(); i++){
+        if(!isalpha(section1[i])){
+            isAlphaLetters = false;
+        }
+    }
+
+    // check section2 for validity, contains only digits and is only 4 digits
+    bool onlyDigits = true;
+    for(int i = 0; i < section2.length(); i++){
+        if(!isdigit(section2[i]) && section2[i] != ' '){
+            onlyDigits = false;
+        }
+    }
+    int token = 0;
+    regex regx(R"((?:^|\s)([+]?[[:digit:]]+(?:\.[[:digit:]]+)?)(?=$|\s))");
+    smatch match; // result of regex match
+    string tempStr = section2;
+    while(regex_search(tempStr, match, regx)){
+        //cout << match[1] << endl;
+        tempStr = match.suffix().str(); // return suffix as a string
+        token ++; // number of tokens
+
+    }
+    
+    //cout << token << endl;
+
+   // printf("token: %d\n", token);
+   //cout << isAlphaLetters << " " << section1.length() % 2 << " " << token << " " << endl;
+
+    // error message if second part is not valid
+    if(isAlphaLetters == false || ((section1.length() % 2) != 0) || (token != 4) || onlyDigits == false){
+        //cout << endl << "Invalid second part." << endl;
+        hillMsg = "Invalid second part";
+        //cout << isAlphaLetters << " " << section1.length() % 2 << " " << token << " " << valid << endl;
+        
+    } else {
+        // if message is valid deipher it
+        
+        // create a 2x2 array that holds the tokens in section 2
+        int s[2][2];
+
+        // extract all the tokens from section2
+        stringstream section2SS;
+        section2SS << section2;
+        string tempSec2; 
+        int number; 
+        int nums[4]; 
+        int i = 0;
+        while(!section2SS.eof()){
+            section2SS >> tempSec2; // extract from section2 word by word
+            //cout << tempSec2 << endl;
+
+            // test if the current extracted word is a number
+            if(stringstream(tempSec2) >> number){
+                if(i < 4){
+                    nums[i] = number;
+                    //cout << nums[i] << endl;
+                    i++;
+                }
+            }
+        }
+
+        s[0][0] = nums[0];
+        s[0][1] = nums[1];
+        s[1][0] = nums[2];
+        s[1][1] = nums[3];
+
+        // output s array
+        // for(int i = 0; i < 2; i++){
+        //     for (int j = 0; j < 2; j++){
+        //         cout << s[i][j] << endl;
+        //     }
+        // }
+
+        // create a 2x1 array out of positions of first two alphabet letters in section 1
+        int c[2][1];
+        int cS[2][1];
+        int multipliedNums[section1.length()];
+        string decipheredMessage = "";
+        // c[0][0] = alphabetToNumber(section1.at(0));
+        // c[1][0] = alphabetToNumber(section1.at(1));
+        
+
+        // loop through section1 string two characters at a time
+        for(int i = 0; i < section1.length(); i += 2){
+            char char1, char2;
+            // store the number two at a time
+            c[0][0] = alphabetToNumber(section1.at(i));
+            c[1][0] = alphabetToNumber(section1.at(i+1));
+            //cout << c[0][0] << endl;
+            //cout << c[1][0] << endl;
+            // multiply C x S
+            cS[0][0] = ((c[0][0] * s[0][0]) + (c[1][0] * s[0][1])) % 26;
+            cS[1][0] = ((c[0][0] * s[1][0]) + (c[1][0] * s[1][1])) % 26;
+            //cout << cS[0][0] << endl;
+            //cout << cS[1][0] << endl;
+            // find the alphabet letters of the numerical value
+            char1 = numberToAlphabet(cS[0][0]);
+            char2 = numberToAlphabet(cS[1][0]);
+            decipheredMessage += char1;
+            decipheredMessage += char2;
+            
+
+        }
+
+        // output deciphered message
+        //cout << " " << decipheredMessage;
+        hillMsg = decipheredMessage;
+        
+    }
+
+    return NULL;
+}
+
+// summit function, deciphers the third part of the message
+void* summit(void* subStr3)
+{
+    string message = *static_cast<string*>(subStr3);
+    //cout << message << endl;
+    
+    // remove any whitespaces from the beginning of the message
+    while(isspace(message[0])){
+        message = message.substr(1, message.length());
+    }
+    
+    // break the message into two sections, section 1 has the first token and section 2 has the rest of it
+    string section1, section2;
+    section1 = message.substr(0, message.find(' ')); // split the message from character 0 to the first space
+    section2 = message.substr(section1.length(), message.length()); // split the message starting from end of sections 1 to end of the message
+
+    //cout << section1 << endl;
+    //cout << section2 << endl;
+    
+    // check is both sections are valid: section 1 must only include alphabets, must be divisible by 3
+    // section 2 must only have 4 tokens, and must be only digits
+    // check section 1 for validity
+    bool isAlphaLetters;
+    for(int i = 0; i < section1.length(); i++){
+        if(isalpha(section1[i])){
+            isAlphaLetters = true;
+        } else{
+            isAlphaLetters = false;
+        }
+    }
+
+    // check section2 for validity, only digits and 9 characters
+    bool onlyDigits = true;
+    for(int i = 0; i < section2.length(); i++){
+        if(!isdigit(section2[i]) && section2[i] != ' '){
+            onlyDigits = false;
+        }
+    }
+    int token = 0;
+    regex regx(R"((?:^|\s)([+]?[[:digit:]]+(?:\.[[:digit:]]+)?)(?=$|\s))");
+    smatch match; // result of regex match
+    string tempStr = section2;
+    while(regex_search(tempStr, match, regx)){
+        //cout << match[1] << endl;
+        tempStr = match.suffix().str(); // return suffix as a string
+        token ++; // number of tokens
+
+    }
+
+    // error message if second part is not valid
+    if(isAlphaLetters == false || ((section1.length() % 3) != 0) || (token != 9)){
+        //cout << endl << "Invalid third part." << endl;
+        summitMsg = "Invalid third part";
+        //cout << isAlphaLetters << " " << section1.length() % 2 << " " << token << " " << valid << endl;
+        
+    } else {
+        // if message is valid deipher it
+        
+        // create a 3x3 array that holds the tokens in section 2
+        int s[3][3];
+
+        // extract all the tokens from section2
+        stringstream section2SS;
+        section2SS << section2;
+        string tempSec2; 
+        int number; 
+        int nums[9]; 
+        int i = 0;
+        while(!section2SS.eof()){
+            section2SS >> tempSec2; // extract from section2 word by word
+
+            // test if the current extracted word is a number
+            if(stringstream(tempSec2) >> number){
+                if(i < 9){
+                    nums[i] = number;
+                    //cout << nums[i] << endl;
+                    i++;
+                }
+            }
+        }
+
+        
+
+        s[0][0] = nums[0];
+        s[0][1] = nums[1];
+        s[0][2] = nums[2];
+        s[1][0] = nums[3];
+        s[1][1] = nums[4];
+        s[1][2] = nums[5];
+        s[2][0] = nums[6];
+        s[2][1] = nums[7];
+        s[2][2] = nums[8];
+
+
+        // output s array
+        // for(int i = 0; i < 3; i++){
+        //     for (int j = 0; j < 3; j++){
+        //         cout << s[i][j] << endl;
+        //     }
+        // }
+
+        // create a 3x1 array out of positions of first two alphabet letters in section 1
+        int c[3][1];
+        int cS[3][1];
+        int multipliedNums[section1.length()];
+        string decipheredMessage = "";
+        // c[0][0] = alphabetToNumber(section1.at(0));
+        // c[1][0] = alphabetToNumber(section1.at(1));
+        
+
+        // loop through section1 string three characters at a time
+        for(int i = 0; i < section1.length(); i += 3){
+            char char1, char2, char3;
+            // store the number two at a time
+            c[0][0] = alphabetToNumber(section1.at(i));
+            c[1][0] = alphabetToNumber(section1.at(i+1));
+            c[2][0] = alphabetToNumber(section1.at(i+2));
+            //cout << c[0][0] << endl;
+            //cout << c[1][0] << endl;
+            // multiply C x S
+            cS[0][0] = ((c[0][0] * s[0][0]) + (c[1][0] * s[0][1]) + (c[2][0] * s[0][2])) % 26;
+            cS[1][0] = ((c[0][0] * s[1][0]) + (c[1][0] * s[1][1]) + (c[2][0] * s[1][2])) % 26;
+            cS[2][0] = ((c[0][0] * s[2][0]) + (c[1][0] * s[2][1]) + (c[2][0] * s[2][2])) % 26;
+            //cout << cS[0][0] << endl;
+            //cout << cS[1][0] << endl;
+            // find the alphabet letters of the numerical value
+            char1 = numberToAlphabet(cS[0][0]);
+            char2 = numberToAlphabet(cS[1][0]);
+            char3 = numberToAlphabet(cS[2][0]);
+
+            decipheredMessage += char1;
+            decipheredMessage += char2;
+            decipheredMessage += char3;
+            
+
+        }
+
+        // output deciphered message
+        //cout << " " << decipheredMessage << endl;
+        summitMsg = decipheredMessage;
+
+    }
+
+
+    return NULL;
+}
